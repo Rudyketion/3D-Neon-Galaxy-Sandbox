@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Neon Galaxy Sandbox</title>
+    <style>
+        /* =========================================
+           ZÁKLADNÝ ŠTÝL A UI
+           ========================================= */
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #ffffff;
+            user-select: none;
+        }
+
+        canvas { display: block; }
+
+        /* Tlačidlo Späť */
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 15, 30, 0.7);
+            color: #00e5ff;
+            border: 1px solid #00e5ff;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+            text-transform: uppercase;
+        }
+        .back-btn:hover {
+            background: #00e5ff;
+            color: #000;
+            box-shadow: 0 0 20px #00e5ff;
+        }
+
+        /* --- WELCOME SCREEN (SPLASH) --- */
+        #welcome-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #0a0e1a 0%, #020205 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.8s ease, visibility 0.8s;
+            text-align: center;
+        }
+
+        #welcome-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .welcome-content {
+            max-width: 550px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 50px;
+            border-radius: 24px;
+            border: 1px solid rgba(0, 229, 255, 0.2);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
+            position: relative;
+            z-index: 1001;
+        }
+
+        .welcome-content h1 {
+            font-size: 3.5rem;
+            margin: 0 0 15px 0;
+            color: #00e5ff;
+            text-shadow: 0 0 25px rgba(0, 229, 255, 0.5);
+            letter-spacing: 8px;
+            font-weight: 900;
+        }
+
+        .welcome-content p {
+            font-size: 1.1rem;
+            line-height: 1.7;
+            color: #bdc3c7;
+            margin-bottom: 35px;
+            font-weight: 300;
+        }
+
+        .launch-btn {
+            background: transparent;
+            color: #ff0055;
+            border: 2px solid #ff0055;
+            padding: 18px 60px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            letter-spacing: 4px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-transform: uppercase;
+        }
+
+        .launch-btn:hover {
+            background: #ff0055;
+            color: #fff;
+            box-shadow: 0 0 40px rgba(255, 0, 85, 0.6);
+            transform: scale(1.05);
+        }
+
+        /* Hviezdy na pozadí */
+        .bg-star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.3;
+            pointer-events: none;
+            animation: moveDown linear infinite;
+        }
+
+        @keyframes moveDown {
+            from { transform: translateY(-10vh); }
+            to { transform: translateY(110vh); }
+        }
+
+        /* Ovládací panel */
+        #ui-container {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(10, 10, 15, 0.8);
+            padding: 25px;
+            border-radius: 12px;
+            border-left: 3px solid #ff0055;
+            width: 280px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            opacity: 0;
+            transform: translateX(30px);
+            transition: all 0.8s ease 0.5s;
+            pointer-events: none;
+        }
+
+        #ui-container.visible {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: all;
+        }
+
+        .control-group { margin-bottom: 15px; }
+        label { display: flex; justify-content: space-between; font-size: 0.75rem; color: #888; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
+        input[type=range] { width: 100%; accent-color: #ff0055; cursor: pointer; }
+        .color-pickers { display: flex; gap: 10px; }
+        input[type=color] { width: 50%; height: 35px; border: none; cursor: pointer; background: transparent; }
+
+        #audio-btn {
+            width: 100%; padding: 12px; margin-top: 10px;
+            background: transparent; border: 1px solid #00ffaa;
+            color: #00ffaa; font-weight: bold; cursor: pointer; transition: 0.3s;
+            text-transform: uppercase;
+        }
+        #audio-btn:hover { background: #00ffaa; color: #000; box-shadow: 0 0 15px #00ffaa; }
+    </style>
+</head>
+<body>
+
+    <!-- Welcome Screen -->
+    <div id="welcome-overlay">
+        <div class="welcome-content">
+            <h1>NEON GALAXY</h1>
+            <p>
+                Step into a procedural universe where mathematics meets art. This sandbox allows you to sculpt a digital galaxy in real-time, manipulating star density, spiral curvature, and cosmic colors. Experience a generative ambient soundscape that evolves as you reshape the fabric of your own 3D space.
+            </p>
+            <button class="launch-btn" id="launch-trigger">LAUNCH</button>
+        </div>
+    </div>
+
+    <!-- Main UI -->
+    <a href="#" class="back-btn">← Späť na portál</a>
+
+    <div id="ui-container">
+        <div class="control-group">
+            <label>Stars <span id="val-count">100k</span></label>
+            <input type="range" id="p-count" min="10000" max="250000" step="10000" value="100000">
+        </div>
+        <div class="control-group">
+            <label>Radius <span id="val-radius">5.0</span></label>
+            <input type="range" id="p-radius" min="1" max="15" step="0.5" value="5">
+        </div>
+        <div class="control-group">
+            <label>Branches <span id="val-branches">3</span></label>
+            <input type="range" id="p-branches" min="2" max="8" step="1" value="3">
+        </div>
+        <div class="control-group">
+            <label>Spin <span id="val-spin">1.5</span></label>
+            <input type="range" id="p-spin" min="-3" max="3" step="0.1" value="1.5">
+        </div>
+        <div class="control-group">
+            <label>Colors</label>
+            <div class="color-pickers">
+                <input type="color" id="p-color-in" value="#ff4500">
+                <input type="color" id="p-color-out" value="#0055ff">
+            </div>
+        </div>
+        <button id="audio-btn">▶ Start Ambient Engine</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        /* --- BACKGROUND STARS LOGIC --- */
+        const createBackgroundStars = () => {
+            const container = document.getElementById('welcome-overlay');
+            for(let i=0; i<60; i++) {
+                const star = document.createElement('div');
+                star.className = 'bg-star';
+                const size = Math.random() * 3 + 'px';
+                star.style.width = size;
+                star.style.height = size;
+                star.style.left = Math.random() * 100 + 'vw';
+                star.style.top = Math.random() * -100 + 'vh';
+                star.style.animationDuration = (Math.random() * 15 + 10) + 's';
+                star.style.animationDelay = Math.random() * 10 + 's';
+                container.appendChild(star);
+            }
+        };
+        createBackgroundStars();
+
+        /* --- SCREEN TRANSITION --- */
+        const launchBtn = document.getElementById('launch-trigger');
+        launchBtn.addEventListener('click', () => {
+            document.getElementById('welcome-overlay').classList.add('hidden');
+            document.getElementById('ui-container').classList.add('visible');
+            if(audioCtx) audioCtx.resume();
+        });
+
+        /* --- THREE.JS GALAXY ENGINE --- */
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(4, 4, 7);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.4;
+
+        const createStarTex = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16,16,0, 16,16,16);
+            grad.addColorStop(0, 'white');
+            grad.addColorStop(1, 'transparent');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,32,32);
+            return new THREE.CanvasTexture(canvas);
+        };
+        const starTex = createStarTex();
+
+        let geometry, material, points;
+        const params = { count: 100000, size: 0.02, radius: 5, branches: 3, spin: 1.5, inColor: '#ff4500', outColor: '#0055ff' };
+
+        const generate = () => {
+            if(points) { geometry.dispose(); material.dispose(); scene.remove(points); }
+            geometry = new THREE.BufferGeometry();
+            const pos = new Float32Array(params.count * 3);
+            const col = new Float32Array(params.count * 3);
+            const colorIn = new THREE.Color(params.inColor);
+            const colorOut = new THREE.Color(params.outColor);
+
+            for(let i=0; i<params.count; i++) {
+                const i3 = i * 3;
+                const r = Math.random() * params.radius;
+                const branchAngle = (i % params.branches) / params.branches * Math.PI * 2;
+                const spinAngle = r * params.spin;
+
+                const randX = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.4 * r;
+                const randY = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.4 * r;
+                const randZ = Math.pow(Math.random(), 3) * (Math.random() < 0.5 ? 1 : -1) * 0.4 * r;
+
+                pos[i3] = Math.cos(branchAngle + spinAngle) * r + randX;
+                pos[i3+1] = randY;
+                pos[i3+2] = Math.sin(branchAngle + spinAngle) * r + randZ;
+
+                const mixedColor = colorIn.clone().lerp(colorOut, r / params.radius);
+                col[i3] = mixedColor.r; col[i3+1] = mixedColor.g; col[i3+2] = mixedColor.b;
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+            material = new THREE.PointsMaterial({ size: params.size, sizeAttenuation: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: true, map: starTex, transparent: true });
+            points = new THREE.Points(geometry, material);
+            scene.add(points);
+        };
+        generate();
+
+        /* --- GENERATIVE AUDIO --- */
+        let audioCtx, osc, filter, gainNode;
+        const initAudio = () => {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            osc = audioCtx.createOscillator();
+            filter = audioCtx.createBiquadFilter();
+            gainNode = audioCtx.createGain();
+            osc.type = 'sine'; osc.frequency.value = 55;
+            filter.type = 'lowpass'; filter.frequency.value = 200;
+            gainNode.gain.value = 0;
+            osc.connect(filter); filter.connect(gainNode); gainNode.connect(audioCtx.destination);
+            osc.start();
+        };
+
+        document.getElementById('audio-btn').addEventListener('click', function() {
+            if(!audioCtx) initAudio();
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            if(gainNode.gain.value === 0) {
+                gainNode.gain.setTargetAtTime(0.4, audioCtx.currentTime, 1);
+                this.innerText = "⏸ Stop Ambient";
+            } else {
+                gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 1);
+                this.innerText = "▶ Start Ambient Engine";
+            }
+        });
+
+        /* --- UI HANDLERS --- */
+        const updateParam = (id, key, isColor=false) => {
+            const el = document.getElementById(id);
+            el.addEventListener('input', (e) => {
+                params[key] = isColor ? e.target.value : parseFloat(e.target.value);
+                if(!isColor) document.getElementById('val-'+id.split('-')[1]).innerText = e.target.value;
+                generate();
+                if(audioCtx) {
+                    osc.frequency.setTargetAtTime(40 + params.branches*12, audioCtx.currentTime, 0.5);
+                    filter.frequency.setTargetAtTime(120 + params.radius*60, audioCtx.currentTime, 0.5);
+                }
+            });
+        };
+        updateParam('p-count', 'count'); updateParam('p-radius', 'radius'); updateParam('p-branches', 'branches');
+        updateParam('p-spin', 'spin'); updateParam('p-color-in', 'inColor', true); updateParam('p-color-out', 'outColor', true);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const animate = () => {
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        };
+        animate();
+    </script>
+</body>
+</html>
